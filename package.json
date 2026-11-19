@@ -1,0 +1,33 @@
+{
+  "name": "opencode-rdp-computer-use",
+  "version": "0.1.0",
+  "description": "Full desktop control for OpenCode over RDP or VNC: screen capture (full or region, cursor highlighted), mouse and keyboard control",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "opencode-plugin",
+    "rdp",
+    "vnc",
+    "computer-use",
+    "wayland",
+    "remote-desktop"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "bridge",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@opencode/plugin": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
