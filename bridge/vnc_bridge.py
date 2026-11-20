@@ -1,4 +1,4 @@
-"""pi-rdp-computer-use - VNC bridge.
+"""opencode-rdp-computer-use - VNC bridge.
 
 Speaks RFB 3.8 straight to a VNC server (verified against gnome-remote-desktop)
 and exposes the same newline-delimited JSON protocol as bridge/rdp_bridge.py, so

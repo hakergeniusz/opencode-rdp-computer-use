@@ -9,7 +9,7 @@
  * model and sends mouse/keyboard events back over the wire.
  *
  * This is a native OpenCode V2 plugin. It registers eight tools and one `/rdp`
- * slash command. See README.md for the mapping from the original Pi extension.
+ * slash command.
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
@@ -33,8 +33,6 @@ function bridgeScript(protocol: string): string {
 }
 
 const CONFIG_PATH = join(homedir(), ".config", "opencode-rdp-computer-use", "config.json")
-/** The original Pi extension's config path, still honoured as a fallback. */
-const LEGACY_CONFIG_PATH = join(homedir(), ".config", "pi-rdp-computer-use", "config.json")
 const DEFAULT_TIMEOUT_MS = 60_000
 const CONNECT_TIMEOUT_MS = 120_000
 /** Ask the user for a decision for this long, then treat silence as a refusal. */
@@ -79,14 +77,11 @@ interface BridgeResponse {
 
 function loadConfig(options: Record<string, unknown> = {}): RdpConfig {
   const config: RdpConfig = {}
-  // Older file first so the new location wins when both exist.
-  for (const path of [LEGACY_CONFIG_PATH, CONFIG_PATH]) {
-    if (existsSync(path)) {
-      try {
-        Object.assign(config, JSON.parse(readFileSync(path, "utf8")) as RdpConfig)
-      } catch {
-        // A malformed config must not disable the plugin.
-      }
+  if (existsSync(CONFIG_PATH)) {
+    try {
+      Object.assign(config, JSON.parse(readFileSync(CONFIG_PATH, "utf8")) as RdpConfig)
+    } catch {
+      // A malformed config must not disable the plugin.
     }
   }
 
@@ -101,15 +96,15 @@ function loadConfig(options: Record<string, unknown> = {}): RdpConfig {
   }
 
   const env = process.env
-  if (env.PI_RDP_PROTOCOL === "rdp" || env.PI_RDP_PROTOCOL === "vnc") config.protocol = env.PI_RDP_PROTOCOL
+  if (env.OPENCODE_RDP_PROTOCOL === "rdp" || env.OPENCODE_RDP_PROTOCOL === "vnc") config.protocol = env.OPENCODE_RDP_PROTOCOL
   if (env.RDP_HOST) config.host = env.RDP_HOST
   if (env.RDP_PORT) config.port = Number(env.RDP_PORT)
   if (env.RDP_USERNAME) config.username = env.RDP_USERNAME
   if (env.RDP_PASSWORD) config.password = env.RDP_PASSWORD
   if (env.RDP_DOMAIN) config.domain = env.RDP_DOMAIN
-  if (env.PI_RDP_PYTHON) config.python = env.PI_RDP_PYTHON
-  if (env.PI_RDP_CONSENT === "session" || env.PI_RDP_CONSENT === "action" || env.PI_RDP_CONSENT === "off") {
-    config.consent = { ...config.consent, mode: env.PI_RDP_CONSENT }
+  if (env.OPENCODE_RDP_PYTHON) config.python = env.OPENCODE_RDP_PYTHON
+  if (env.OPENCODE_RDP_CONSENT === "session" || env.OPENCODE_RDP_CONSENT === "action" || env.OPENCODE_RDP_CONSENT === "off") {
+    config.consent = { ...config.consent, mode: env.OPENCODE_RDP_CONSENT }
   }
   return config
 }
@@ -166,7 +161,7 @@ class Bridge {
       throw new Error(`Bridge script missing: ${script}`)
     }
 
-    const explicitPython = this.config.python ?? process.env.PI_RDP_PYTHON
+    const explicitPython = this.config.python ?? process.env.OPENCODE_RDP_PYTHON
     const command = explicitPython ?? "uv"
     const withArgs = (BRIDGE_DEPS[this.protocol] ?? []).flatMap((dep) => ["--with", dep])
     const args = explicitPython

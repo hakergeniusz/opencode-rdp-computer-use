@@ -1,4 +1,4 @@
-"""Shared image helpers for the pi-rdp-computer-use bridges.
+"""Shared image helpers for the opencode-rdp-computer-use bridges.
 
 Both transports (RDP via aardwolf, VNC via raw RFB) capture a full framebuffer
 and then hand it here for cropping, cursor highlighting and encoding. Keeping

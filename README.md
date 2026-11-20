@@ -2,7 +2,7 @@
 
 Full desktop control for [OpenCode V2](https://opencode.ai) over **RDP or VNC**: the agent sees a remote desktop as images and drives it with mouse and keyboard events.
 
-This is a native OpenCode V2 plugin rewritten from [`pi-rdp-computer-use`](https://github.com/hakergeniusz/pi-rdp-computer-use). It needs no X11 tooling, screencast portal or `uinput`: it speaks the remote desktop protocol directly through a headless Python bridge.
+This is a native OpenCode V2 plugin. It needs no X11 tooling, screencast portal or `uinput`: it speaks the remote desktop protocol directly through a headless Python bridge.
 
 | Protocol | Bridge | Use when |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ Python bridge (bridge/*.py)  ── RDP (aardwolf) or RFB 3.8 ──▶  desktop
 
 The bridge is a headless process: no window is opened, so this works on headless machines and under Wayland alike. Observation is the remote framebuffer returned as a PNG (or JPEG); input is sent as RDP fastpath input events or RFB pointer/key events. Screenshots are returned to the model as OpenCode tool `file` content with a `data:<mime>;base64,...` URI.
 
-The plugin tracks server-ignored resolutions, reconnect transparently with stored credentials when a session drops, and closes the bridge stdin first on disconnect so the server tears the session down cleanly.
+The plugin tracks server-ignored resolutions, reconnects transparently with stored credentials when a session drops, and closes the bridge stdin first on disconnect so the server tears the session down cleanly.
 
 ## Install / load
 
@@ -88,11 +88,11 @@ Every coordinate is a **desktop pixel** (origin at the top-left of the whole scr
 
 The same guidance is injected into the model's system context on each agent-loop request, so the agent knows to screenshot first and disconnect when done.
 
-### Consent
+## Configuration
 
 | Setting | Environment | Config / option |
 | --- | --- | --- |
-| protocol | `PI_RDP_PROTOCOL` | `protocol` |
+| protocol | `OPENCODE_RDP_PROTOCOL` | `protocol` |
 | host | `RDP_HOST` | `host` |
 | port | `RDP_PORT` | `port` (default `3389` RDP, `5900` VNC) |
 | username | `RDP_USERNAME` | `username` (RDP only) |
@@ -100,22 +100,24 @@ The same guidance is injected into the model's system context on each agent-loop
 | domain | `RDP_DOMAIN` | `domain` |
 | geometry | – | `width`, `height` |
 | screenshot cap | – | `maxScreenshotWidth` |
-| python | `PI_RDP_PYTHON` | `python` |
-| consent | `PI_RDP_CONSENT` | `consent.mode`, `consent.screenshots`, `consent.timeoutMs` |
+| python | `OPENCODE_RDP_PYTHON` | `python` |
+| consent | `OPENCODE_RDP_CONSENT` | `consent.mode`, `consent.screenshots`, `consent.timeoutMs` |
 
-Config file: `~/.config/opencode-rdp-computer-use/config.json` (the legacy `~/.config/pi-rdp-computer-use/config.json` is read as a fallback).
+Config file: `~/.config/opencode-rdp-computer-use/config.json`.
 
 ```json
 {
   "protocol": "vnc",
   "host": "127.0.0.1",
   "port": 5900,
-  "password": "secret12",
+  "password": "[REDACTED:JSON Secret Field]",
   "consent": { "mode": "session", "timeoutMs": 180000 }
 }
 ```
 
-`consent.mode` works like the original:
+### Consent
+
+`consent.mode` controls when the user is asked before actions are sent to the remote desktop:
 
 | Mode | Behaviour |
 | --- | --- |
@@ -123,31 +125,19 @@ Config file: `~/.config/opencode-rdp-computer-use/config.json` (the legacy `~/.c
 | `action` | A confirmation before every click, drag, scroll and keystroke. |
 | `off` | Never ask. |
 
-Consent uses OpenCode's `ctx.permission.assert` with the custom actions `desktop.control` and `desktop.screenshot`. Unknown actions resolve to `ask` by default; you can add explicit rules (e.g. `{"desktop.control": "deny"}`) in `opencode.json(c)` to forbid desktop control entirely. A prompt that nobody answers within `consent.timeoutMs` (default 3 minutes) is retracted and counted as a refusal, so a forgotten dialog can never turn into unattended remote control. Set `consent.screenshots: true` to also gate screenshots and `rdp_wait`. The legacy `consent.actions` boolean is honoured (`false` → `off`, `true` → `action`).
+Consent uses OpenCode's permission system with the custom actions `desktop.control` and `desktop.screenshot`. Unknown actions resolve to `ask` by default; you can add explicit rules (e.g. `{"desktop.control": "deny"}`) in `opencode.json(c)` to forbid desktop control entirely. A prompt that nobody answers within `consent.timeoutMs` (default 3 minutes) is retracted and counted as a refusal, so a forgotten dialog can never turn into unattended remote control. Set `consent.screenshots: true` to also gate screenshots and `rdp_wait`.
 
 ## Slash command
 
 `/rdp connect [host] | status | doctor | shot [path] | region x y w h [path] | disconnect`
 
-Results are posted back to the session as synthetic messages instead of Pi's `ui.notify` toast.
+Results are posted back to the session as synthetic messages.
 
-## Mapping from the Pi original and known gaps
+## Notes
 
-- `pi.registerTool` → `ctx.tool.transform` with JSON-Schema `input` and `execute(input, context)`. Context cancellation uses `context.signal`.
-- Pi `details` → OpenCode tool `metadata`; Pi `content` arrays → OpenCode `content` parts (`text` and `file` with a base64 data URI).
-- `pi.registerCommand` → `ctx.command.transform`; `ctx.ui.notify` → `ctx.session.synthetic`.
-- `ctx.ui.confirm` consent → `ctx.permission.assert` (+ `list`/`reply` for the auto-decline timeout).
-- `NAMESPACE.instructions` → `ctx.session.hook("context")` system-prompt injection; `NAMESPACE` itself → `editor.namespace`.
-- `session_shutdown` bridge cleanup → the plugin's `setup` cleanup function.
-
-Intentional gaps / differences:
-
-- Pi's `exposure: "deferred"` and automatic `tool_search` activation have no V2 equivalent. All desktop tools are registered normally and are always available to the model.
-- Pi's `label`, `promptSnippet`, `promptGuidelines` and `executionMode: "sequential"` have no V2 equivalents; the useful guidance was folded into each tool's `description`.
-- OpenCode's permission UI controls the prompt's visual appearance; there is no Pi-style countdown rendered in the dialog. The plugin uses its own timer to retract unanswered requests and refuse the action.
-- The plugin's `setup` is per loaded location, not per conversation session, so the bridge lives until the plugin unloads (or `rdp_disconnect` is called), rather than ending on every Pi `session_shutdown`.
-- No TUI part: there is no terminal status widget or custom renderer, matching the non-TUI-focused original.
-- Tools opt into Code Mode (`options.codemode: true`), which is the recommended V2 default.
+- All desktop tools are registered in the `desktop` namespace and opt into Code Mode.
+- The plugin's `setup` is per loaded location, so the bridge lives until the plugin unloads (or `rdp_disconnect` is called).
+- There is no terminal status widget or custom renderer.
 
 ## Troubleshooting
 
@@ -159,7 +149,7 @@ Intentional gaps / differences:
 
 ## Tests
 
-The original extension had no automated tests, so none were ported. The Python bridge scripts are copied verbatim from the original project so the plugin is self-contained at runtime.
+No automated tests are currently included. The Python bridge scripts in `bridge/` are included for runtime use.
 
 ## License
 

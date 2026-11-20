@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Headless RDP bridge for the pi-rdp-computer-use extension.
+"""Headless RDP bridge for the opencode-rdp-computer-use plugin.
 
 Speaks newline-delimited JSON on stdin/stdout so a language model driven agent
 can observe and control a remote desktop without a local display server, X11 or
